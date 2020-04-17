@@ -2,6 +2,8 @@ package storage
 
 import "testing"
 
+// TODO add benchmarks
+
 func TestMemory_SetGet(t *testing.T) {
 	table := []struct {
 		name   string
@@ -39,10 +41,10 @@ func TestMemory_SetGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewMemory()
             for _, key := range tt.keys {
-            	m.Set([]byte(key))
+            	m.Increment([]byte(key))
 			}
 			got := m.Get([]byte(tt.expKey))
-            if got != int64(tt.expVal) {
+            if got != uint64(tt.expVal) {
 				t.Errorf("Exp: %d, Got: %d", tt.expVal, got)
 			}
 		})

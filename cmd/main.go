@@ -5,6 +5,13 @@ import (
 	"fmt"
 )
 
+// TODO add WebServer
+// TODO add logging, access log, errors, warnings, etc
+// TODO graceful shutdown
+// TODO create swagger, add endpoint to WebServer
+// TODO make it persistent
+// TODO scale it with multiple instances
+
 func main() {
 	fmt.Println(" --- start --- ")
 
@@ -19,7 +26,7 @@ func main() {
 
 
 
-	fmt.Println("One: ", a.Get("one"))
-	fmt.Println("Three: ", a.Get("three"))
-	fmt.Println("Four: ", a.Get("four"))
+	fmt.Println("One: ", a.Get([]string{"one"}))
+	fmt.Println("Three: ", a.Get([]string{"three", "one"}))
+	fmt.Println("Four: ", a.Get([]string{"four"}))
 }
