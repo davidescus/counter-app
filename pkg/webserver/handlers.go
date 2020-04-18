@@ -6,15 +6,23 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
+	"net/url"
 )
 
 // TODO add rate limiter handler
 
 func accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO add data here, should connect request with response, to log status code for response
-		log.Println("TODO access log handler add details here ...")
+		ipAddr := r.RemoteAddr
+		if ip := r.Header.Get("X-FORWARDED-FOR"); ip != "" {
+			ipAddr = ip
+		}
+		// TODO add more details here
+		log.Printf("[AccessLog] %s \"%s %s",
+			ipAddr,
+			r.Method,
+			r.RequestURI,
+		)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -31,24 +39,25 @@ func final(app *app.App) http.Handler {
 		log.Println("final handler ....")
 		switch r.Method {
 		case "GET":
-			err := r.ParseForm()
+			w.Header().Set("Content-Type", "application/json")
+			u, err := url.Parse(r.RequestURI)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				log.Println("Error: ", err)
 				return
 			}
-			keys := r.Form.Get("keywords")
-			results := app.Get(strings.Fields(keys))
+			params := u.Query()
+			results := app.Get(params["keywords"])
 			response, err := json.Marshal(results)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				log.Println("Error: ", err)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			w.Write(response)
 		case "POST":
+			w.Header().Set("Content-Type", "text/plain")
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -67,9 +76,10 @@ func final(app *app.App) http.Handler {
 	})
 }
 
-func swaggerInfoHandler(app *app.App) http.Handler {
+func swaggerInfo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("final handler ....")
-		w.Write([]byte("TODO serve static html swagger"))
+		w.Header().Set("Content-Type", "text/json; charset=utf-8")
+		http.ServeFile(w, r, "./static/swagger.json")
 	})
 }

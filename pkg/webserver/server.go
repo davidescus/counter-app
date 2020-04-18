@@ -15,7 +15,8 @@ type Server struct {
 
 func New(app *app.App, port string) Server {
 	router := http.NewServeMux()
-	router.Handle("/", accessLog(auth(final(app))))
+	router.Handle("/keywords", accessLog(auth(final(app))))
+	router.Handle("/swagger", accessLog(auth(swaggerInfo())))
 
 	s := Server{
 		app:  app,

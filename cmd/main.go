@@ -9,11 +9,13 @@ import (
 	"os/signal"
 )
 
-// TODO create swagger, add endpoint for it (/info)
 // TODO add populate access log
+// TODO add rate limiter,
 // TODO make it persistent
 // TODO scale it with multiple instances
 // TODO use flags to add params
+// TODO performance tests
+// TODO fix swagger, maybe CORS problem
 
 func main() {
 	log.Println("--- start ---")

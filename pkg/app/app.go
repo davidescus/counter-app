@@ -11,8 +11,8 @@ import (
 // Occurrence represents the number of occurrences
 // for a specific string keyword
 type Occurrence struct {
-	Key   string
-	Count uint64
+	Key   string `json:"key"`
+	Count uint64 `json:"count"`
 }
 
 type App struct {

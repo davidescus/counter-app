@@ -1,0 +1,112 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Distributed storage able to index and query number of occurencies by words",
+    "version": "1.0.0",
+    "title": "Counter App"
+  },
+  "tags": [
+    {
+      "name": "keywords",
+      "description": "Manage number of occurrensies for each word",
+      "externalDocs": {
+        "description": "Find out more",
+        "url": "http://swagger.io"
+      }
+    }
+  ],
+  "host": "localhost:3000",
+  "schemes": [
+    "http"
+  ],
+  "paths": {
+    "/keywords": {
+      "get": {
+        "tags": [
+          "keywords"
+        ],
+        "summary": "Occurrencies number",
+        "description": "Find number of occurencies for each word",
+        "operationId": "getOccurrenciesByWords",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "keywords",
+            "in": "query",
+            "description": "Collection of words for that you want to get the number of occurrencies",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Occurrence"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "keywords"
+        ],
+        "summary": "Increment occurrencies number",
+        "description": "Text will be split it into words that will be indexed individualy",
+        "produces": [
+          "text/plain"
+        ],
+        "consumes": [
+          "text/plain"
+        ],
+        "parameters": [
+          {
+            "name": "text",
+            "in": "body",
+            "description": "Text that you want to index",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Occurrence": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Find out more about Swagger",
+    "url": "http://swagger.io"
+  }
+}
