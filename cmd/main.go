@@ -1,32 +1,36 @@
 package main
 
 import (
+	"context"
 	"counter-app/pkg/app"
-	"fmt"
+	"counter-app/pkg/webserver"
+	"log"
+	"os"
+	"os/signal"
 )
 
-// TODO add WebServer
-// TODO add logging, access log, errors, warnings, etc
-// TODO graceful shutdown
-// TODO create swagger, add endpoint to WebServer
+// TODO create swagger, add endpoint for it (/info)
+// TODO add populate access log
 // TODO make it persistent
 // TODO scale it with multiple instances
+// TODO use flags to add params
 
 func main() {
-	fmt.Println(" --- start --- ")
+	log.Println("--- start ---")
+	ctx, cancel := context.WithCancel(context.Background())
 
-	a := app.New()
+	application := app.New(ctx)
+	server := webserver.New(application, "3000")
 
-	// TODO maybe trigger this when create app
-	a.Start()
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	log.Println("Press CTRL + c to graceful shutdown ...")
+	<-sigint
 
-	err := a.Store("one tho one three")
-	// TODO maybe not return error, writing to memory
-	_ = err
+	log.Println("Shutting down ...")
+	cancel()
+	server.Stop()
+	application.GracefulShutDown()
 
-
-
-	fmt.Println("One: ", a.Get([]string{"one"}))
-	fmt.Println("Three: ", a.Get([]string{"three", "one"}))
-	fmt.Println("Four: ", a.Get([]string{"four"}))
+	log.Println(" --- end ---")
 }
