@@ -32,9 +32,9 @@ func New(app *app.App, port string) Server {
 }
 
 func (s *Server) start() {
-	log.Printf("WebServer starts and listen on port: %s", s.port)
+	log.Printf("[Success] WebServer start and listen on port: %s", s.port)
 	if err := s.httpServer.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("HTTP server ListenAndServe: %v", err)
+		log.Fatalf("[Error] HTTP server ListenAndServe: %v", err)
 	}
 }
 
@@ -42,8 +42,8 @@ func (s *Server) Stop() {
 	log.Println("WebServer stopping ...")
 	err := s.httpServer.Shutdown(context.Background())
 	if err != nil {
-		log.Printf("HTTP server Shutdown: %v", err)
+		log.Printf("[Error] HTTP server Shutdown: %v", err)
 		return
 	}
-	log.Println("WebServer stops with success.")
+	log.Println("[Success] WebServer stop.")
 }

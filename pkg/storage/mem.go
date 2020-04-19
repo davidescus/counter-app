@@ -11,20 +11,20 @@ import (
 // Memory is the basic data structure that holds
 // number of occurrence for each keyword
 type Memory struct {
-	mu *sync.RWMutex
+	mu          *sync.RWMutex
 	occurrences map[uint64]uint64
-	crcTable *crc64.Table
+	crcTable    *crc64.Table
 }
 
 func NewMemory() *Memory {
 	return &Memory{
 		occurrences: make(map[uint64]uint64),
-		crcTable: crc64.MakeTable(crc64.ISO),
+		crcTable:    crc64.MakeTable(crc64.ISO),
 	}
 }
 
 func (m *Memory) Increment(keyword []byte) {
-   m.occurrences[m.generateHash(keyword)]++
+	m.occurrences[m.generateHash(keyword)]++
 }
 
 func (m *Memory) Get(keyword []byte) uint64 {

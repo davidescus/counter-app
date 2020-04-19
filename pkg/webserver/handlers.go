@@ -18,32 +18,32 @@ func accessLog(next http.Handler) http.Handler {
 			ipAddr = ip
 		}
 		// TODO add more details here
-		log.Printf("[AccessLog] %s \"%s %s",
+		log.Printf("[AccessLog] %s \"%s %s %s",
 			ipAddr,
 			r.Method,
 			r.RequestURI,
+			r.UserAgent(),
 		)
 		next.ServeHTTP(w, r)
 	})
 }
 
+// use it if needed
 func auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Use auth handler if needed ...")
 		next.ServeHTTP(w, r)
 	})
 }
 
 func final(app *app.App) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("final handler ....")
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")
 			u, err := url.Parse(r.RequestURI)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error: ", err)
+				log.Println("[Error] ", err)
 				return
 			}
 			params := u.Query()
@@ -51,7 +51,7 @@ func final(app *app.App) http.Handler {
 			response, err := json.Marshal(results)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error: ", err)
+				log.Println("[Error] ", err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -61,12 +61,12 @@ func final(app *app.App) http.Handler {
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error: ", err)
+				log.Println("[Error] ", err)
 				return
 			}
 			if err = app.Store(string(body)); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error: ", err)
+				log.Println("[Error] ", err)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -78,7 +78,6 @@ func final(app *app.App) http.Handler {
 
 func swaggerInfo() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("final handler ....")
 		w.Header().Set("Content-Type", "text/json; charset=utf-8")
 		http.ServeFile(w, r, "./static/swagger.json")
 	})
