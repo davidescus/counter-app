@@ -1,8 +1,18 @@
 package memory
 
-import "testing"
+import (
+	"context"
+	"log"
+	"os"
+	"testing"
+)
 
 // TODO add benchmarks
+var (
+	logger = log.New(os.Stdout, "", 0)
+	ctx    = context.Background()
+	conf   = &Config{ID: 4}
+)
 
 func TestMemory_SetGet(t *testing.T) {
 	table := []struct {
@@ -39,7 +49,7 @@ func TestMemory_SetGet(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewMemory()
+			m := NewMemory(ctx, logger, conf)
 			for _, key := range tt.keys {
 				m.Increment([]byte(key))
 			}

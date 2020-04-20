@@ -1,8 +1,11 @@
 package localdisk
 
 import (
+	"bytes"
 	"context"
 	"counter-app/pkg/persistence"
+	"encoding/binary"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -32,6 +35,7 @@ func NewLocalDisk(ctx context.Context, logger *log.Logger, conf *Conf, memory pe
 		path:            conf.Path,
 		file:            conf.File,
 		flashIntervalMS: conf.FlushIntervalMS,
+		finishFlush:     make(chan struct{}),
 	}
 	return &ld, ld.initiateFiles()
 }
@@ -55,8 +59,10 @@ func (d *LocalDisk) initiateFiles() error {
 }
 
 func (d *LocalDisk) LoadVolatileStorage() error {
-	// TODO implement me
-	var data []byte
+	data, err := d.ReadFromDisk()
+	if err != nil {
+		return err
+	}
 	d.volatileStorage.Import(data)
 
 	return nil
@@ -64,13 +70,7 @@ func (d *LocalDisk) LoadVolatileStorage() error {
 
 // FlushNow will flush to disk all data now
 func (d *LocalDisk) FlushNow() error {
-	log.Println("--- FlushNow()")
-	data := d.volatileStorage.Export()
-
-	// TODO implement logic here
-	_ = data
-
-	return nil
+	return d.WriteToDisk(d.volatileStorage.Export())
 }
 
 // StartFlashing will start a goroutine that will
@@ -95,9 +95,112 @@ func (d *LocalDisk) StartFlashing() {
 // StopFlashing will wait for finish flush signal
 // and execute last flash on disk
 func (d *LocalDisk) StopFlashing() error {
-	log.Println("-----Wait for finish flush")
 	<-d.finishFlush
-	log.Println("------ finish stop flush")
 	return d.FlushNow()
 
+}
+
+// WriteToDisk will write data on disk
+func (d *LocalDisk) WriteToDisk(data map[uint64][]uint64) error {
+	path, err := filepath.Abs(d.path)
+	if err != nil {
+		return err
+	}
+
+	// TODO better permission management, why 0644 not works?
+	f, err := os.OpenFile(path+"/"+d.file, os.O_WRONLY, 0766)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+
+	// TODO create new file before write, swap it after
+
+	var buf []byte
+	var placeholder [8]byte
+	// memory layout: uint64(key) uint64(len(totals) [uint64 ...](totals values)
+	for k, v := range data {
+		binary.LittleEndian.PutUint64(placeholder[:], k)
+		buf = append(buf, placeholder[:]...)
+		// waste resources with uint64, but keep it simple at the moment
+		binary.LittleEndian.PutUint64(placeholder[:], uint64(len(v)))
+		buf = append(buf, placeholder[:]...)
+
+		// v []uint64, range over it and add them
+		for _, vv := range v {
+			binary.LittleEndian.PutUint64(placeholder[:], vv)
+			buf = append(buf, placeholder[:]...)
+		}
+	}
+
+	_, err = f.Write(buf)
+
+	return err
+}
+
+// ReadFromDisk will read data and map it into struncture
+func (d *LocalDisk) ReadFromDisk() (map[uint64][]uint64, error) {
+	log.Println("--- Read from disk")
+
+	path, err := filepath.Abs(d.path)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path + "/" + d.file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	data := make(map[uint64][]uint64)
+	var placeholder [8]byte
+	// memory layout: uint64(key) uint64(len(totals) [uint64 ...](totals values)
+	for {
+		// hash
+		_, err := f.Read(placeholder[:])
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		key, err := decode(placeholder[0:8])
+		if err != nil {
+			return nil, err
+		}
+
+		// keys len
+		if _, err := f.Read(placeholder[:]); err != nil {
+			return nil, err
+		}
+		sliceLen, err := decode(placeholder[0:8])
+		if err != nil {
+			return nil, err
+		}
+
+		// get totals
+		var i uint64
+		var totals []uint64
+		for ; i < sliceLen; i++ {
+			if _, err := f.Read(placeholder[:]); err != nil {
+				return nil, err
+			}
+			v, err := decode(placeholder[0:8])
+			if err != nil {
+				return nil, err
+			}
+			totals = append(totals, v)
+		}
+
+		data[key] = totals
+	}
+
+	return data, nil
+}
+
+func decode(b []byte) (uint64, error) {
+	var i uint64
+	reader := bytes.NewReader(b)
+	err := binary.Read(reader, binary.LittleEndian, &i)
+	return i, err
 }

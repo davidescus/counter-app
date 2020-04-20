@@ -34,7 +34,8 @@ func main() {
 	logger.Println("--- Start ---")
 
 	// Start memory
-	mem := memory.NewMemory()
+	memConf := &memory.Config{ID: 3}
+	mem := memory.NewMemory(ctx, logger, memConf)
 
 	// Start persistence
 	persistenceConf := &localdisk.Conf{
@@ -50,6 +51,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Println("[Info] Data loaded into volatile storage with success.")
 	persistence.StartFlashing()
 	log.Printf("[Info] Start flashing into persistent storage periodically at: %d ms\n",
@@ -82,8 +84,10 @@ func main() {
 	log.Println("[Success] Stop HTTP server public api.")
 
 	err = persistence.StopFlashing()
-	// TODO implement retry here, it is the last flush and it is important
-	logger.Println("[Error] Flush to disk before close with error: ", err)
+	if err != nil {
+		// TODO implement retry here, it is the last flush and it is important
+		logger.Println("[Error] Flush to disk before close with error: ", err)
+	}
 
 	log.Println(" --- End ---")
 }
