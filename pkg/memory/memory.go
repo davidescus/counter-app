@@ -1,4 +1,4 @@
-package storage
+package memory
 
 import (
 	"hash/crc64"
@@ -29,6 +29,16 @@ func (m *Memory) Increment(keyword []byte) {
 
 func (m *Memory) Get(keyword []byte) uint64 {
 	return m.occurrences[m.generateHash(keyword)]
+}
+
+func (m *Memory) Import([]byte) {
+	// TODO to implement
+}
+
+func (m *Memory) Export() []byte {
+	// TODO to implement
+
+	return []byte{}
 }
 
 // by transforming []bytes into uint64 wil help us

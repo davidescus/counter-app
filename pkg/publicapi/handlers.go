@@ -1,12 +1,12 @@
-package webserver
+package publicapi
 
 import (
-	"counter-app/pkg/app"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // TODO add rate limiter handler
@@ -35,7 +35,7 @@ func auth(next http.Handler) http.Handler {
 	})
 }
 
-func final(app *app.App) http.Handler {
+func final(storage Storage) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
@@ -47,7 +47,7 @@ func final(app *app.App) http.Handler {
 				return
 			}
 			params := u.Query()
-			results := app.Get(params["keywords"])
+			results := get(params["keywords"], storage)
 			response, err := json.Marshal(results)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -64,11 +64,7 @@ func final(app *app.App) http.Handler {
 				log.Println("[Error] ", err)
 				return
 			}
-			if err = app.Store(string(body)); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("[Error] ", err)
-				return
-			}
+			store(body, storage)
 			w.WriteHeader(http.StatusOK)
 		default:
 			w.WriteHeader(http.StatusBadRequest)
@@ -81,4 +77,22 @@ func swaggerInfo() http.Handler {
 		w.Header().Set("Content-Type", "text/json; charset=utf-8")
 		http.ServeFile(w, r, "./static/swagger.json")
 	})
+}
+
+func get(keywords []string, storage Storage) []Occurrence {
+	var results []Occurrence
+	for _, key := range keywords {
+		results = append(results, Occurrence{
+			Key:   key,
+			Count: storage.Get([]byte(strings.ToLower(key))),
+		})
+	}
+	return results
+}
+
+func store(body []byte, storage Storage) {
+	keywords := strings.Fields(strings.ToLower(string(body)))
+	for _, keyword := range keywords {
+		storage.Increment([]byte(keyword))
+	}
 }

@@ -1,4 +1,4 @@
-package storage
+package memory
 
 import "testing"
 
@@ -40,11 +40,11 @@ func TestMemory_SetGet(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewMemory()
-            for _, key := range tt.keys {
-            	m.Increment([]byte(key))
+			for _, key := range tt.keys {
+				m.Increment([]byte(key))
 			}
 			got := m.Get([]byte(tt.expKey))
-            if got != uint64(tt.expVal) {
+			if got != uint64(tt.expVal) {
 				t.Errorf("Exp: %d, Got: %d", tt.expVal, got)
 			}
 		})
