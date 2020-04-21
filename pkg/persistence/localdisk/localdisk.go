@@ -13,18 +13,18 @@ import (
 )
 
 type Conf struct {
-	Path, File      string
-	FlushIntervalMS int
+	Path, File   string
+	DumpInterval time.Duration
 }
 
 type LocalDisk struct {
-	ctx             context.Context
-	logger          *log.Logger
-	volatileStorage persistence.Storage
-	path            string
-	file            string
-	flashIntervalMS int
-	finishFlush     chan struct{}
+	ctx                   context.Context
+	logger                *log.Logger
+	volatileStorage       persistence.Storage
+	path                  string
+	file                  string
+	dumpInterval          time.Duration
+	endSig, endSigSuccess chan struct{}
 }
 
 func NewLocalDisk(ctx context.Context, logger *log.Logger, conf *Conf, memory persistence.Storage) (*LocalDisk, error) {
@@ -34,8 +34,9 @@ func NewLocalDisk(ctx context.Context, logger *log.Logger, conf *Conf, memory pe
 		volatileStorage: memory,
 		path:            conf.Path,
 		file:            conf.File,
-		flashIntervalMS: conf.FlushIntervalMS,
-		finishFlush:     make(chan struct{}),
+		dumpInterval:    conf.DumpInterval,
+		endSig:          make(chan struct{}),
+		endSigSuccess:   make(chan struct{}),
 	}
 	return &ld, ld.initiateFiles()
 }
@@ -68,36 +69,37 @@ func (d *LocalDisk) LoadVolatileStorage() error {
 	return nil
 }
 
-// FlushNow will flush to disk all data now
-func (d *LocalDisk) FlushNow() error {
+// DumpNow will flush to disk all data now
+func (d *LocalDisk) DumpNow() error {
 	return d.WriteToDisk(d.volatileStorage.Export())
 }
 
-// StartFlashing will start a goroutine that will
+// StartPersistentDumps will start a goroutine that will
 // flush data to disc periodic at specific interval
-func (d *LocalDisk) StartFlashing() {
-	go func(ch chan struct{}) {
+func (d *LocalDisk) StartPersistentDumps() {
+	go func() {
 		for {
 			select {
 			case <-d.ctx.Done():
-				ch <- struct{}{}
+			case <-d.endSig:
+				d.endSigSuccess <- struct{}{}
 				return
 			default:
-				if err := d.FlushNow(); err != nil {
-					d.logger.Println("[Error] Flash to dish: ", err)
+				if err := d.DumpNow(); err != nil {
+					d.logger.Println("[Error] PersistenceDump: ", err)
 				}
-				time.Sleep(time.Duration(d.flashIntervalMS) * time.Millisecond)
+				time.Sleep(d.dumpInterval)
 			}
 		}
-	}(d.finishFlush)
+	}()
 }
 
-// StopFlashing will wait for finish flush signal
-// and execute last flash on disk
-func (d *LocalDisk) StopFlashing() error {
-	<-d.finishFlush
-	return d.FlushNow()
-
+// StopPersistenceDump will wait for finish flush signal
+// and execute last Dump on disk
+func (d *LocalDisk) StopPersistenceDump() error {
+	d.endSig <- struct{}{}
+	<-d.endSigSuccess
+	return d.DumpNow()
 }
 
 // WriteToDisk will write data on disk
@@ -140,8 +142,6 @@ func (d *LocalDisk) WriteToDisk(data map[uint64][]uint64) error {
 
 // ReadFromDisk will read data and map it into struncture
 func (d *LocalDisk) ReadFromDisk() (map[uint64][]uint64, error) {
-	log.Println("--- Read from disk")
-
 	path, err := filepath.Abs(d.path)
 	if err != nil {
 		return nil, err

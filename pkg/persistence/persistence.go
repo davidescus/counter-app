@@ -10,7 +10,7 @@ type Storage interface {
 // PersistentStorage represents API expose outside
 type PersistentStorage interface {
 	LoadVolatileStorage() error
-	FlushNow() error
-	StartFlashing()
-	StopFlashing() error
+	DumpNow() error
+	StartPersistentDumps()
+	StopPersistenceDump() error
 }

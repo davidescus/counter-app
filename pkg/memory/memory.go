@@ -100,6 +100,7 @@ func (m *Memory) Export() map[uint64][]uint64 {
 	return export
 }
 
+// Merge will keep highest values
 func (m *Memory) Merge(data map[uint64][]uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

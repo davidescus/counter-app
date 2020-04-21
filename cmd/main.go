@@ -5,7 +5,7 @@ import (
 	"counter-app/pkg/memory"
 	"counter-app/pkg/persistence/localdisk"
 	"counter-app/pkg/publicapi"
-	"counter-app/pkg/syncapi"
+	"counter-app/pkg/syncsrv"
 	"errors"
 	"fmt"
 	"log"
@@ -13,15 +13,8 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 )
-
-// TODO add sync service
-// TODO scale it with multiple instances
-// TODO improve disk tests
-// TODO performance tests
-// TODO add rate limiter, limit number of concurrent requests
-// TODO fix swagger, maybe CORS problem
-// TODO add details on access log
 
 // Default values used
 type config struct {
@@ -38,10 +31,11 @@ type config struct {
 	// listen and serve GET and POST on /keywords
 	// env: COUNTER_PUBLIC_PORT
 	publicPort string
-	// used internal for syncapi with other nodes
+	// used internal for syncsrv with other nodes
 	// env: COUNTER_SYNC_PORT
-	syncPort                   string
-	persistenceFlushIntervalMS int
+	syncPort     string
+	dumpInterval time.Duration
+	syncInterval time.Duration
 }
 
 func main() {
@@ -49,39 +43,41 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	conf := &config{}
+	dumpInt, _ := time.ParseDuration("1s")
+	syncInt, _ := time.ParseDuration("2s")
 	conf.localStoragePath = "data"
 	conf.localStorageFile = "base"
-	conf.persistenceFlushIntervalMS = 1000
+	conf.dumpInterval = dumpInt
+	conf.syncInterval = syncInt
 
 	// parse env vars
 	err := parseEnvVars(conf)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal("[Fatal] ", err)
 	}
 
-	// Start memory
+	// StartPersistentDumps memory
 	memConf := &memory.Config{ID: conf.nodeId}
 	mem := memory.NewMemory(ctx, logger, memConf)
 
-	// Start persistence
+	// StartPersistentDumps persistence
 	persistenceConf := &localdisk.Conf{
-		Path:            conf.localStoragePath + strconv.Itoa(conf.nodeId),
-		File:            conf.localStorageFile,
-		FlushIntervalMS: conf.persistenceFlushIntervalMS,
+		Path:         conf.localStoragePath,
+		File:         conf.localStorageFile + strconv.Itoa(conf.nodeId),
+		DumpInterval: conf.dumpInterval,
 	}
 	persistence, err := localdisk.NewLocalDisk(ctx, logger, persistenceConf, mem)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("[Fatal] ", err)
 	}
 	err = persistence.LoadVolatileStorage()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("[Fatal] ", err)
 	}
-
 	logger.Println("[Info] Data loaded into volatile storage with success.")
-	persistence.StartFlashing()
-	logger.Printf("[Info] Start flashing into persistent storage periodically at: %d ms\n",
-		conf.persistenceFlushIntervalMS,
+	persistence.StartPersistentDumps()
+	logger.Printf("[Info] StartPersistentDumps periodically at: %d ms\n",
+		conf.dumpInterval,
 	)
 
 	// start public endpoint
@@ -91,47 +87,44 @@ func main() {
 	publicApi := publicapi.New(ctx, logger, publicConf, mem)
 	publicApi.Start()
 
-	// start sync endpoint
-	syncConf := &syncapi.Config{
-		Port: conf.syncPort,
+	// start sync service
+	syncConf := &syncsrv.Config{
+		Seeds:         conf.seeds,
+		ListeningPort: conf.syncPort,
+		SyncInterval:  conf.syncInterval,
 	}
-	syncApi := syncapi.New(ctx, logger, syncConf, mem)
-	syncApi.Start()
+	sync := syncsrv.New(ctx, logger, syncConf, mem)
+	sync.Start()
 
-	// Graceful shutdown
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	log.Println("[Info] Press CTRL + c to graceful shutdown ...")
-	<-sigint
 
-	log.Println("[Info] Shutting down ...")
+	// Wait, shutdown gracefully
+	<-sigint
+	logger.Println("[Info] Shutting down ...")
 	cancel()
 
 	var message string
 	// Stop public server
-	message = fmt.Sprint("[Success] Stop HTTP server public api.")
+	message = fmt.Sprint("[Success] PublicService HTTP stop.")
 	err = publicApi.Stop()
 	if err != nil {
-		message = fmt.Sprintf("[Error] HTTP server public api: %v", err)
+		message = fmt.Sprintf("[Error] PublicService: %v", err)
 	}
 	logger.Println(message)
 
-	message = fmt.Sprint("[Success] Stop flushing data to persistent storage.")
-	err = persistence.StopFlashing()
+	// Stop persistence
+	message = fmt.Sprint("[Success] PersistentDumps stop.")
+	err = persistence.StopPersistenceDump()
 	if err != nil {
-		message = fmt.Sprintf("[Error] Flush to disk before close with error: %s", err)
-		// TODO implement retry here, it is the last flush and it is important
+		message = fmt.Sprintf("[Error] PersistentDump before close: %s", err)
 	}
 	logger.Println(message)
 
-	// stop sync service
-	// Stop public server
-	message = fmt.Sprint("[Success] Stop HTTP sync public api.")
-	err = syncApi.Stop()
-	if err != nil {
-		message = fmt.Sprintf("[Error] HTTP server sync api: %v", err)
-	}
-	logger.Println(message)
+	// Stop sync service
+	sync.Stop()
+	logger.Println("[Success] SyncService stops.")
 
 	log.Println(" --- End ---")
 }
@@ -167,7 +160,7 @@ func parseEnvVars(conf *config) error {
 		)
 	}
 	conf.syncPort = syncPort
-	conf.seeds = strings.Fields(os.Getenv("COUNTER_SEEDS"))
+	conf.seeds = strings.Split(os.Getenv("COUNTER_SEEDS"), ",")
 
 	return nil
 }

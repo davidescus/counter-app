@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 )
 
 // Occurrence represents the number of occurrences
@@ -43,7 +44,7 @@ func New(ctx context.Context, logger *log.Logger, conf *Config, memory Storage) 
 	}
 }
 
-// Start will start public api HTTP server
+// StartPersistentDumps will start public api HTTP server
 func (s *Server) Start() {
 	router := http.NewServeMux()
 	router.Handle("/keywords", accessLog(auth(final(s.storage))))
@@ -56,11 +57,13 @@ func (s *Server) Start() {
 	}
 
 	go func() {
-		s.logger.Printf("[Success] Start HTTP public api server on port: %s", s.port)
+		s.logger.Printf("[Success] PublicService HTTP start on: %s", s.port)
 		if err := s.http.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("[Error] HTTP server ListenAndServe: %v", err)
+			s.logger.Fatalf("[Error] SyncService ListenAndServe: %v", err)
 		}
 	}()
+
+	<-time.After(1 * time.Second)
 }
 
 // Stop will stop public api HTTP server
