@@ -37,6 +37,8 @@ func auth(next http.Handler) http.Handler {
 
 func final(storage Storage) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO remove header, testing purpose
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")

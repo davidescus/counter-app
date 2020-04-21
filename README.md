@@ -18,7 +18,7 @@ Implemented based on [Conflict-free replicated data type](https://en.wikipedia.o
 * clone repo
 * add env vars on each node (see bellow)
 * go run cmd/main.go (or build it or install it)
-* access /swagger from browser on public port that you set it on env vars, you can get from there a swagger definition as json
+* access /swagger from browser on public port that you set it on env vars, you can get from there a swagger definition as json (you can go to editor.swagger.io, modify host and test it from there)
 
 #### Node prepare
 This is an example of 3 nodes configuration
